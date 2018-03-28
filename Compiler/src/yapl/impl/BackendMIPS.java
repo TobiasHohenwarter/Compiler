@@ -4,7 +4,14 @@ import java.io.PrintStream;
 
 public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 
+	private final String LF = "\n";
+
+	private PrintStream outputFile;
+	private String tempOutput;
+
 	public BackendMIPS(PrintStream out) {
+		this.outputFile = out;
+		tempOutput = "";
 		// TODO Auto-generated constructor stub
 	}
 
@@ -41,13 +48,19 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 	@Override
 	public void comment(String comment) {
 		// TODO Auto-generated method stub
+		tempOutput += " # " + comment + LF;
 
 	}
 
 	@Override
 	public void emitLabel(String label, String comment) {
 		// TODO Auto-generated method stub
-
+		tempOutput += label + ":";
+		if (comment != null) {
+			comment(comment);
+		} else {
+			tempOutput += LF;
+		}
 	}
 
 	@Override
@@ -89,18 +102,23 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 	@Override
 	public void loadConst(byte reg, int value) {
 		// TODO Auto-generated method stub
+		tempOutput += "li $" + String.valueOf(reg) + ", " + String.valueOf(value) + LF;
 
 	}
 
 	@Override
 	public void loadAddress(byte reg, int addr, boolean isStatic) {
 		// TODO Auto-generated method stub
+		// tempOutput += "la $" + String.valueOf(reg) + ", " +
+		// String.valueOf(value) + LF;
 
 	}
 
 	@Override
 	public void loadWord(byte reg, int addr, boolean isStatic) {
 		// TODO Auto-generated method stub
+		// tempOutput += "lw $" + String.valueOf(reg) + ", " +
+		// String.valueOf(value) + LF;
 
 	}
 
@@ -155,24 +173,27 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 	@Override
 	public void add(byte regDest, byte regX, byte regY) {
 		// TODO Auto-generated method stub
+		tempOutput += "add $" + regDest + ", $" + regX + ", $" + regY + LF;
 
 	}
 
 	@Override
 	public void addConst(byte regDest, byte regX, int value) {
 		// TODO Auto-generated method stub
+		tempOutput += "addi $" + regDest + ", $" + regX + ", " + value + LF;
 
 	}
 
 	@Override
 	public void sub(byte regDest, byte regX, byte regY) {
 		// TODO Auto-generated method stub
-
+		tempOutput += "sub $" + regDest + ", $" + regX + ", $" + regY + LF;
 	}
 
 	@Override
 	public void mul(byte regDest, byte regX, byte regY) {
 		// TODO Auto-generated method stub
+		tempOutput += "mult $" + regDest + ", $" + regX + ", $" + regY + LF;
 
 	}
 
@@ -239,13 +260,16 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 	@Override
 	public void enterMain() {
 		// TODO Auto-generated method stub
+		tempOutput = ".data" + LF + ".text" + LF + "main:" + LF;
 
 	}
 
 	@Override
 	public void exitMain(String label) {
 		// TODO Auto-generated method stub
-
+		tempOutput += label + ":" + LF + "li $v0, 10" + LF + "syscall";
+		outputFile.print(tempOutput);
+		outputFile.flush();
 	}
 
 	@Override
