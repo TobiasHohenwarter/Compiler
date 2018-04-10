@@ -203,7 +203,7 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 
 	@Override
 	public void add(byte regDest, byte regX, byte regY) {
-		// TODO Auto-generated method stub
+		// TODO Auto-generated method stu
 		tempOutput += "add $" + regDest + ", $" + regX + ", $" + regY + LF;
 
 	}
