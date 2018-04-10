@@ -1,6 +1,10 @@
 package yapl.impl;
 
 import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.Dictionary;
+import java.util.HashMap;
+import java.util.Map;
 
 public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 
@@ -9,52 +13,68 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 	private PrintStream outputFile;
 	private String tempOutput;
 
+	private Map<Byte, Boolean> registers;
+	private int stackOffset;
+	private Map<Integer, String> staticData;
+	private int staticOffset;
+
+	private byte getNextFreeReg() {
+		byte j = -1;
+		for (byte i = 8; i < 26 && j == -1; i++) {
+			if (registers.get(i) == false) {
+				j = i;
+			}
+		}
+		return j;
+	}
+
 	public BackendMIPS(PrintStream out) {
 		this.outputFile = out;
 		tempOutput = "";
-		// TODO Auto-generated constructor stub
+		stackOffset = 0;
+		staticOffset = 0;
+		stringCount = 1;
+		staticData = new HashMap<>();
+		registers = new HashMap<>();
+		for (byte i = 8; i < 26; i++) {
+			registers.put(i, false);
+		}
 	}
 
 	@Override
 	public int wordSize() {
-		// TODO Auto-generated method stub
 		return Integer.parseInt(System.getProperty("sun.arch.data.model")) / 8;
 	}
 
 	@Override
 	public int boolValue(boolean value) {
-		// TODO Auto-generated method stub
 		return value ? 1 : 0;
 	}
 
 	@Override
 	public byte allocReg() {
-		// TODO Auto-generated method stub
-		return 0;
+		return getNextFreeReg();
 	}
 
 	@Override
 	public void freeReg(byte reg) {
-		// TODO Auto-generated method stub
+		registers.put(reg, false);
 
 	}
 
 	@Override
 	public byte zeroReg() {
-		// TODO Auto-generated method stub
 		return 0;
 	}
 
 	@Override
 	public void comment(String comment) {
-		// TODO Auto-generated method stub
 		tempOutput += " # " + comment + LF;
 
 	}
 
 	@Override
 	public void emitLabel(String label, String comment) {
-		// TODO Auto-generated method stub
 		tempOutput += label + ":";
 		if (comment != null) {
 			comment(comment);
@@ -65,14 +85,27 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 
 	@Override
 	public int allocStaticData(int bytes, String comment) {
-		// TODO Auto-generated method stub
-		return 0;
+		int startAddress = staticOffset;
+		// word-aligned
+		staticOffset += (int) Math.ceil(bytes / wordSize()) * wordSize();
+		return startAddress;
 	}
+
+	private int stringCount;
 
 	@Override
 	public int allocStringConstant(String string) {
-		// TODO Auto-generated method stub
-		return 0;
+		int startAddress = staticOffset;
+		string += '\0';
+		staticData.put(startAddress, "str" + stringCount);
+		staticOffset += string.getBytes().length;
+		int index = tempOutput.indexOf(".text");
+		String str1 = tempOutput.substring(0, index - 1);
+		String str2 = tempOutput.substring(index);
+		str1 += LF + "str" + stringCount + ": .asciiz \"" + string + "\"" + LF;
+		tempOutput = str1 + str2;
+		stringCount++;
+		return startAddress;
 	}
 
 	@Override
@@ -160,8 +193,7 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 
 	@Override
 	public void writeString(int addr) {
-		// TODO Auto-generated method stub
-
+		tempOutput += "la $a0, " + staticData.get(addr) + LF + "li $v0, 4" + LF + "syscall" + LF;
 	}
 
 	@Override
