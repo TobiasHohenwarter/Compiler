@@ -198,7 +198,6 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 
 	@Override
 	public void neg(byte regDest, byte regX) {
-		// TODO Auto-generated method stub
 
 	}
 
