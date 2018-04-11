@@ -110,8 +110,9 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 
 	@Override
 	public int allocStack(int bytes, String comment) {
-		// TODO Auto-generated method stub
-		return 0;
+		int retVal = stackOffset;
+		stackOffset += (int) Math.ceil(bytes / wordSize()) * wordSize();
+		return retVal;
 	}
 
 	@Override
@@ -198,12 +199,12 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 
 	@Override
 	public void neg(byte regDest, byte regX) {
-
+		tempOutput += "sub $" + regDest + ", $" + zeroReg() + ", $" + regX + LF;
 	}
 
 	@Override
 	public void add(byte regDest, byte regX, byte regY) {
-		// TODO Auto-generated method stu
+		// TODO Auto-generated method stub
 		tempOutput += "add $" + regDest + ", $" + regX + ", $" + regY + LF;
 
 	}
@@ -231,60 +232,69 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 	@Override
 	public void div(byte regDest, byte regX, byte regY) {
 		// TODO Auto-generated method stub
-
+		tempOutput += "divu $" + regDest + ", $" + regX + ", $" + regY + LF;
 	}
 
 	@Override
 	public void mod(byte regDest, byte regX, byte regY) {
 		// TODO Auto-generated method stub
-
+		tempOutput += "rem $" + regDest + ", $" + regX + ", $" + regY + LF;
 	}
 
 	@Override
 	public void isLess(byte regDest, byte regX, byte regY) {
 		// TODO Auto-generated method stub
-
+		tempOutput += "slt $" + regDest + ", $" + regX + ", $" + regY + LF;
 	}
 
 	@Override
 	public void isLessOrEqual(byte regDest, byte regX, byte regY) {
 		// TODO Auto-generated method stub
-
+		tempOutput += "sle $" + regDest + ", $" + regX + ", $" + regY + LF;
 	}
 
 	@Override
 	public void isEqual(byte regDest, byte regX, byte regY) {
 		// TODO Auto-generated method stub
+		tempOutput += "seq $" + regDest + ", $" + regX + ", $" + regY + LF;
 
 	}
 
 	@Override
 	public void not(byte regDest, byte regSrc) {
 		// TODO Auto-generated method stub
+		tempOutput += "not $" + regDest + ", $" + regSrc + LF;
 
 	}
 
 	@Override
 	public void and(byte regDest, byte regX, byte regY) {
 		// TODO Auto-generated method stub
+		tempOutput += "and $" + regDest + ", $" + regX + ", $" + regY + LF;
 
 	}
 
 	@Override
 	public void or(byte regDest, byte regX, byte regY) {
 		// TODO Auto-generated method stub
+		tempOutput += "or $" + regDest + ", $" + regX + ", $" + regY + LF;
 
 	}
 
 	@Override
 	public void branchIf(byte reg, boolean value, String label) {
 		// TODO Auto-generated method stub
-
+		byte bool = (byte) boolValue(value);
+		byte freeRegNum = allocReg();
+		tempOutput += "addi $" + freeRegNum + ", $" + freeRegNum + ", " + bool + LF;
+		tempOutput += "beq $" + reg + ", $" + freeRegNum + ", " + label + LF;
+		freeReg(freeRegNum);
 	}
 
 	@Override
 	public void jump(String label) {
 		// TODO Auto-generated method stub
+		tempOutput += "j " + label + LF;
 
 	}
 
