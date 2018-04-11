@@ -3,6 +3,8 @@ package yapl.test.backend.rm;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
 
+import com.sun.xml.internal.fastinfoset.algorithm.BuiltInEncodingAlgorithm.WordListener;
+
 import yapl.impl.BackendMIPS;
 import yapl.interfaces.BackendAsmRM;
 

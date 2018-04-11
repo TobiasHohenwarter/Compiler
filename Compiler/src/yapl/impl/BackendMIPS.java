@@ -43,7 +43,7 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 
 	@Override
 	public int wordSize() {
-		return Integer.parseInt(System.getProperty("sun.arch.data.model")) / 8;
+		return 4;
 	}
 
 	@Override
@@ -100,8 +100,15 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 		staticData.put(startAddress, "str" + stringCount);
 		staticOffset += string.getBytes().length;
 		int index = tempOutput.indexOf(".text");
-		String str1 = tempOutput.substring(0, index - 1);
-		String str2 = tempOutput.substring(index);
+		String str1;
+		String str2;
+		if (index != -1) {
+			str1 = tempOutput.substring(0, index - 1);
+			str2 = tempOutput.substring(index);
+		} else {
+			str1 = tempOutput;
+			str2 = "";
+		}
 		str1 += LF + "str" + stringCount + ": .asciiz \"" + string + "\"" + LF;
 		tempOutput = str1 + str2;
 		stringCount++;
@@ -111,19 +118,32 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 	@Override
 	public int allocStack(int bytes, String comment) {
 		int retVal = stackOffset;
-		stackOffset += (int) Math.ceil(bytes / wordSize()) * wordSize();
+		int wordAlignedAddition = (int) Math.ceil(bytes / wordSize()) * wordSize();
+		stackOffset += wordAlignedAddition;
+		tempOutput += "addi $sp, $sp" + wordAlignedAddition;
+		if (comment != null) {
+			tempOutput += " # " + comment;
+		}
+		tempOutput += LF;
 		return retVal;
 	}
 
 	@Override
 	public void allocHeap(byte destReg, int bytes) {
-		// TODO Auto-generated method stub
+		int wordAlignedSize = (int) Math.ceil(bytes / wordSize()) * wordSize();
+		tempOutput += "li $a0, " + wordAlignedSize + LF;
+		tempOutput += "li $v0, 9" + LF; // syscall for heap alloc - mem address
+										// is in v0
+		tempOutput += "syscall " + LF;
+		tempOutput += "add $" + destReg + ", $" + zeroReg() + ", $v0" + LF;
 
 	}
 
 	@Override
 	public void storeArrayDim(int dim, byte lenReg) {
 		// TODO Auto-generated method stub
+		int wordAlignedAddition = (int) Math.ceil(lenReg / wordSize()) * wordSize();
+		allocStack(wordAlignedAddition * dim, null);
 
 	}
 
@@ -135,7 +155,6 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 
 	@Override
 	public void loadConst(byte reg, int value) {
-		// TODO Auto-generated method stub
 		tempOutput += "li $" + String.valueOf(reg) + ", " + String.valueOf(value) + LF;
 
 	}
@@ -150,15 +169,21 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 
 	@Override
 	public void loadWord(byte reg, int addr, boolean isStatic) {
-		// TODO Auto-generated method stub
-		// tempOutput += "lw $" + String.valueOf(reg) + ", " +
-		// String.valueOf(value) + LF;
+		if (isStatic) {
+			tempOutput += "lw $" + String.valueOf(reg) + ", " + String.valueOf(addr) + "($gp)" + LF;
+		} else {
+			tempOutput += "lw $" + String.valueOf(reg) + ", " + String.valueOf(addr) + "($sp)" + LF;
+		}
 
 	}
 
 	@Override
 	public void storeWord(byte reg, int addr, boolean isStatic) {
-		// TODO Auto-generated method stub
+		if (isStatic) {
+			tempOutput += "sw $" + String.valueOf(reg) + ", " + String.valueOf(addr) + "($gp)" + LF;
+		} else {
+			tempOutput += "sw $" + String.valueOf(reg) + ", " + String.valueOf(addr) + "($sp)" + LF;
+		}
 
 	}
 
@@ -204,86 +229,73 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 
 	@Override
 	public void add(byte regDest, byte regX, byte regY) {
-		// TODO Auto-generated method stub
 		tempOutput += "add $" + regDest + ", $" + regX + ", $" + regY + LF;
 
 	}
 
 	@Override
 	public void addConst(byte regDest, byte regX, int value) {
-		// TODO Auto-generated method stub
 		tempOutput += "addi $" + regDest + ", $" + regX + ", " + value + LF;
 
 	}
 
 	@Override
 	public void sub(byte regDest, byte regX, byte regY) {
-		// TODO Auto-generated method stub
 		tempOutput += "sub $" + regDest + ", $" + regX + ", $" + regY + LF;
 	}
 
 	@Override
 	public void mul(byte regDest, byte regX, byte regY) {
-		// TODO Auto-generated method stub
 		tempOutput += "mult $" + regDest + ", $" + regX + ", $" + regY + LF;
 
 	}
 
 	@Override
 	public void div(byte regDest, byte regX, byte regY) {
-		// TODO Auto-generated method stub
 		tempOutput += "divu $" + regDest + ", $" + regX + ", $" + regY + LF;
 	}
 
 	@Override
 	public void mod(byte regDest, byte regX, byte regY) {
-		// TODO Auto-generated method stub
 		tempOutput += "rem $" + regDest + ", $" + regX + ", $" + regY + LF;
 	}
 
 	@Override
 	public void isLess(byte regDest, byte regX, byte regY) {
-		// TODO Auto-generated method stub
 		tempOutput += "slt $" + regDest + ", $" + regX + ", $" + regY + LF;
 	}
 
 	@Override
 	public void isLessOrEqual(byte regDest, byte regX, byte regY) {
-		// TODO Auto-generated method stub
 		tempOutput += "sle $" + regDest + ", $" + regX + ", $" + regY + LF;
 	}
 
 	@Override
 	public void isEqual(byte regDest, byte regX, byte regY) {
-		// TODO Auto-generated method stub
 		tempOutput += "seq $" + regDest + ", $" + regX + ", $" + regY + LF;
 
 	}
 
 	@Override
 	public void not(byte regDest, byte regSrc) {
-		// TODO Auto-generated method stub
 		tempOutput += "not $" + regDest + ", $" + regSrc + LF;
 
 	}
 
 	@Override
 	public void and(byte regDest, byte regX, byte regY) {
-		// TODO Auto-generated method stub
 		tempOutput += "and $" + regDest + ", $" + regX + ", $" + regY + LF;
 
 	}
 
 	@Override
 	public void or(byte regDest, byte regX, byte regY) {
-		// TODO Auto-generated method stub
 		tempOutput += "or $" + regDest + ", $" + regX + ", $" + regY + LF;
 
 	}
 
 	@Override
 	public void branchIf(byte reg, boolean value, String label) {
-		// TODO Auto-generated method stub
 		byte bool = (byte) boolValue(value);
 		byte freeRegNum = allocReg();
 		tempOutput += "addi $" + freeRegNum + ", $" + freeRegNum + ", " + bool + LF;
@@ -293,21 +305,18 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 
 	@Override
 	public void jump(String label) {
-		// TODO Auto-generated method stub
 		tempOutput += "j " + label + LF;
 
 	}
 
 	@Override
 	public void enterMain() {
-		// TODO Auto-generated method stub
 		tempOutput = ".data" + LF + ".text" + LF + "main:" + LF;
 
 	}
 
 	@Override
 	public void exitMain(String label) {
-		// TODO Auto-generated method stub
 		tempOutput += label + ":" + LF + "li $v0, 10" + LF + "syscall";
 		outputFile.print(tempOutput);
 		outputFile.flush();
@@ -315,38 +324,46 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 
 	@Override
 	public void enterProc(String label, int nParams) {
-		// TODO Auto-generated method stub
-
+		tempOutput += label + ": " + LF;
+		tempOutput += "subi $sp, $sp, " + wordSize() + LF;
+		tempOutput += "sw $ra, 0($sp)" + LF;
 	}
 
 	@Override
 	public void exitProc(String label) {
-		// TODO Auto-generated method stub
-
+		tempOutput += "exit_" + label + ": " + LF;
+		tempOutput += "lw $ra, 0($sp)" + LF;
+		tempOutput += "addi $sp, $sp, " + wordSize() + LF;
+		tempOutput += "jr $ra " + LF;
 	}
 
 	@Override
 	public void returnFromProc(String label, byte reg) {
-		// TODO Auto-generated method stub
-
+		if (reg != -1) {
+			tempOutput += "move $v0, $" + reg + LF;
+		}
+		tempOutput += "j exit_" + label + ": " + LF;
 	}
 
 	@Override
 	public void prepareProcCall(int numArgs) {
 		// TODO Auto-generated method stub
-
+		tempOutput += "subi $sp, $sp, " + (numArgs + 1) * wordSize() + LF;
+		tempOutput += "sw $ra,0($sp)" + LF;
 	}
 
 	@Override
 	public void passArg(int arg, byte reg) {
-		// TODO Auto-generated method stub
-
+		int arrAccess = (arg + 1) * wordSize();
+		tempOutput += " sw $" + reg + ", " + arrAccess + "($sp) " + LF;
 	}
 
 	@Override
 	public void callProc(byte reg, String name) {
-		// TODO Auto-generated method stub
-
+		tempOutput += " jal " + name + LF;
+		if (reg != -1) {
+			tempOutput += " move $" + reg + ", $v0 " + LF;
+		}
 	}
 
 	@Override
