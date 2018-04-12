@@ -42,6 +42,7 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 		for (byte i = 8; i < 26 && j == -1; i++) {
 			if (registers.get(i) == false) {
 				j = i;
+				registers.put(i, true);
 			}
 		}
 		return j;
@@ -389,8 +390,19 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 	public void exitMain(String label) {
 		tempOutput += label + ":" + LF + "li $v0, 10" + LF + "syscall" + LF;
 		emitProvidedProcedures();
+		emitJMain();
 		outputFile.print(tempOutput);
 		outputFile.flush();
+	}
+
+	private void emitJMain() {
+		int index = tempOutput.indexOf(".text");
+		String str1;
+		String str2;
+		str1 = tempOutput.substring(0, index + 5);
+		str2 = tempOutput.substring(index + 6);
+		str1 += LF + "j main" + LF;
+		tempOutput = str1 + str2;
 	}
 
 	@Override
