@@ -19,8 +19,7 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 	private int staticDataOffset;
 	private byte staticDataRegister;
 	private int currentFrameOffset;
-	private int preProcCallFrameOffset;
-	private int procCallParams;
+	private int saveFrameOffset;
 
 	public BackendMIPS(PrintStream out) {
 		this.outputFile = out;
@@ -34,12 +33,8 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 		for (byte i = 8; i < 26; i++) {
 			registers.put(i, false);
 		}
-	}
 
-	private void setStaticDataRegister() {
-		staticDataRegister = (byte) 25;
-		registers.put((byte) 25, true);
-		tempOutput += "la $" + staticDataRegister + ", staticData" + LF;
+		tempOutput = ".data" + LF + "staticData: " + LF + ".text" + LF;
 	}
 
 	private byte getNextFreeReg() {
@@ -130,12 +125,13 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 		int retVal = stackOffset;
 		int wordAlignedAddition = (int) Math.ceil(bytes / wordSize()) * wordSize();
 		stackOffset += wordAlignedAddition;
-		tempOutput += "addi $sp, $sp" + wordAlignedAddition;
+		tempOutput += "addi $sp, $sp, -" + wordAlignedAddition;
 		if (comment != null) {
 			tempOutput += " # " + comment;
 		}
 		tempOutput += LF;
-		return retVal;
+		currentFrameOffset = currentFrameOffset - wordAlignedAddition;
+		return currentFrameOffset;
 	}
 
 	@Override
@@ -149,12 +145,17 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 
 	}
 
+	int currentArrayDim;
+
 	@Override
 	public void storeArrayDim(int dim, byte lenReg) {
-		// TODO Auto-generated method stub
-		int wordAlignedAddition = (int) Math.ceil(lenReg / wordSize()) * wordSize();
-		allocStack(wordAlignedAddition * dim, null);
-
+		dim++;
+		// dimensions > 2 cannot be created
+		if ((dim == 1)) {
+			storeWord(lenReg, (dim * 4), true);
+		} else {
+			// throw new Exception
+		}
 	}
 
 	@Override
@@ -321,9 +322,8 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 
 	@Override
 	public void enterMain() {
-		tempOutput = ".data" + LF + "staticData: " + LF + ".text" + LF;
 		tempOutput += "main:" + LF; // TODO
-		setStaticDataRegister();
+		currentFrameOffset = -4;
 	}
 
 	private void emitProvidedProcedures() {
@@ -396,16 +396,28 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 	@Override
 	public void enterProc(String label, int nParams) {
 		tempOutput += label + ": " + LF;
-		tempOutput += "subi $sp, $sp, " + wordSize() + LF;
-		tempOutput += "sw $ra, 0($sp)" + LF;
+		allocStack(2 * wordSize(), null);
+		tempOutput += "sw $fp, 0($sp)" + LF;
+		tempOutput += "sw $ra, 4($sp)" + LF;
+
+		tempOutput += " addi $fp,$sp,4" + LF;
+		currentFrameOffset = -4;
 	}
 
 	@Override
 	public void exitProc(String label) {
 		tempOutput += label + ": " + LF;
-		tempOutput += "lw $ra, 0($sp)" + LF;
-		tempOutput += "addi $sp, $sp, " + wordSize() + LF;
-		tempOutput += "jr $ra " + LF;
+		currentFrameOffset = -4;
+
+		this.loadWord((byte) 31, 0, false);
+		this.loadWord((byte) 30, -4, false);
+
+		tempOutput += " addi $sp,$sp,4" + LF;
+
+		currentFrameOffset = saveFrameOffset;
+
+		tempOutput += "jr $ra" + LF;
+
 	}
 
 	@Override
@@ -416,24 +428,58 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 		tempOutput += "j exit_" + label + ": " + LF;
 	}
 
+	private ArrayList<Byte> storedRegs = new ArrayList<>();
+	private int numArgs = 0;
+
 	@Override
 	public void prepareProcCall(int numArgs) {
 		// TODO Auto-generated method stub
-		tempOutput += "subi $sp, $sp, " + (numArgs + 1) * wordSize() + LF;
+		saveFrameOffset = this.currentFrameOffset;
+		int tempFrameOffset = this.currentFrameOffset;
+		for (byte k : registers.keySet()) {
+			if (registers.get(k)) {
+				storedRegs.add(k);
+				tempFrameOffset -= 4;
+				allocStack(4, "");
+				storeWord(k, tempFrameOffset, false);
+			}
+		}
+
+		allocStack(numArgs * 4, "");
+		this.numArgs = numArgs;
+
 	}
 
 	@Override
 	public void passArg(int arg, byte reg) {
-		int arrAccess = (arg + 1) * wordSize();
-		tempOutput += " sw $" + reg + ", " + arrAccess + "($sp) " + LF;
+		tempOutput += " sw $" + reg + ", " + arg + "($sp) " + LF;
 	}
 
 	@Override
 	public void callProc(byte reg, String name) {
+		for (byte b : storedRegs)
+			freeReg(b);
+
 		tempOutput += " jal " + name + LF;
+
+		currentFrameOffset += 4 * this.numArgs;
+		tempOutput += "addi $sp,$sp," + 4 * this.numArgs + LF;
+
+		int tempFrameOffset = this.saveFrameOffset;
+
+		for (byte k : storedRegs) {
+			registers.put(k, true);
+			tempFrameOffset -= 4;
+			loadWord(k, tempFrameOffset, false);
+		}
+
+		tempOutput += " addi $sp,$sp," + 4 * storedRegs.size() + LF;
+		storedRegs.clear();
+
 		if (reg != -1) {
 			tempOutput += " move $" + reg + ", $v0 " + LF;
 		}
+
 	}
 
 	@Override
