@@ -147,13 +147,14 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 	}
 
 	int currentArrayDim;
+	int arrLength;
 
 	@Override
 	public void storeArrayDim(int dim, byte lenReg) {
-		dim++;
+		currentArrayDim = dim + 1; // as dim starts at 0
 		// dimensions > 2 cannot be created
-		if ((dim == 1)) {
-			storeWord(lenReg, (dim * 4), true);
+		if ((currentArrayDim == 1)) {
+			storeWord(lenReg, arrLength, true);
 		} else {
 			// throw new Exception
 		}
@@ -161,8 +162,20 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 
 	@Override
 	public void allocArray(byte destReg) {
-		// TODO Auto-generated method stub
-
+		if (currentArrayDim == 1) {
+			// allocate 1-dimensional array - MUST NOT call _allocArray() in
+			// run-time library!
+			loadWord((byte) 4, arrLength, true);
+			addConst((byte) 4, (byte) 4, 1); // header for array length
+			mul((byte) 4, (byte) 4, (byte) 4);
+			loadConst((byte) 2, 9); // 'sbrk' system call code
+			tempOutput += "syscall" + LF;
+			loadWord((byte) 4, arrLength, true);
+			storeWordReg((byte) 4, (byte) 2); // write array length
+			tempOutput += "move $" + destReg + ", $v0" + LF;
+		} else if (currentArrayDim > 1) {
+			// throw new Exception
+		}
 	}
 
 	@Override
@@ -173,9 +186,11 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 
 	@Override
 	public void loadAddress(byte reg, int addr, boolean isStatic) {
-		// TODO Auto-generated method stub
-		// tempOutput += "la $" + String.valueOf(reg) + ", " +
-		// String.valueOf(value) + LF;
+		if(isStatic) {
+			tempOutput+="lw $" + reg + ", " + addr + "($"+staticDataRegister+")"+LF;
+		}else {
+			tempOutput+="lw $" + reg + ", " + addr + "($fp)"+LF;
+		}
 
 	}
 
@@ -201,31 +216,31 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 
 	@Override
 	public void loadWordReg(byte reg, byte addrReg) {
-		// TODO Auto-generated method stub
+		tempOutput+="lw $"+reg+",0($"+addrReg+")"+LF;
 
 	}
 
 	@Override
 	public void loadWordReg(byte reg, byte addrReg, int offset) {
-		// TODO Auto-generated method stub
+		tempOutput+="lw $"+reg+","+offset*wordSize()+"($"+addrReg+")"+LF;
 
 	}
 
 	@Override
 	public void storeWordReg(byte reg, int addrReg) {
-		// TODO Auto-generated method stub
+		tempOutput+="sw $"+reg+",0($"+addrReg+")"+LF;
 
 	}
 
 	@Override
 	public void arrayOffset(byte dest, byte baseAddr, byte index) {
-		// TODO Auto-generated method stub
+		tempOutput+="lw $"+dest+","+(index+1)*wordSize()+"($"+baseAddr+")"+LF;
 
 	}
 
 	@Override
 	public void arrayLength(byte dest, byte baseAddr) {
-		// TODO Auto-generated method stub
+		tempOutput+="lw $"+dest+",0($"+baseAddr+")"+LF;
 
 	}
 
@@ -244,6 +259,10 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 		tempOutput += "add $" + regDest + ", $" + regX + ", $" + regY + LF;
 
 	}
+	
+	public void addi(byte regDest,byte regX,int imm) {
+		tempOutput+="addi $"+regDest+",$"+regX+","+imm+LF;
+	}
 
 	@Override
 	public void addConst(byte regDest, byte regX, int value) {
@@ -258,7 +277,7 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 
 	@Override
 	public void mul(byte regDest, byte regX, byte regY) {
-		tempOutput += "mult $" + regDest + ", $" + regX + ", $" + regY + LF;
+		tempOutput += "mul $" + regDest + ", $" + regX + ", $" + regY + LF;
 
 	}
 
