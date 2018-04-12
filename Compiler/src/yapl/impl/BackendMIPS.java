@@ -17,6 +17,13 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 	private int stackOffset;
 	private Map<Integer, String> staticData;
 	private int staticOffset;
+	private byte staticDataRegister;
+
+	private void setStaticDataRegister() {
+		staticDataRegister = (byte) 25;
+		registers.put((byte) 25, true);
+		tempOutput += "la $" + staticDataRegister + ", staticData" + LF;
+	}
 
 	private byte getNextFreeReg() {
 		byte j = -1;
@@ -170,9 +177,9 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 	@Override
 	public void loadWord(byte reg, int addr, boolean isStatic) {
 		if (isStatic) {
-			tempOutput += "lw $" + String.valueOf(reg) + ", " + String.valueOf(addr) + "($gp)" + LF;
+			tempOutput += "lw $" + reg + ", " + addr + "($gp)" + LF;
 		} else {
-			tempOutput += "lw $" + String.valueOf(reg) + ", " + String.valueOf(addr) + "($sp)" + LF;
+			tempOutput += "lw $" + reg + ", " + addr + "($fp)" + LF;
 		}
 
 	}
@@ -180,9 +187,9 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 	@Override
 	public void storeWord(byte reg, int addr, boolean isStatic) {
 		if (isStatic) {
-			tempOutput += "sw $" + String.valueOf(reg) + ", " + String.valueOf(addr) + "($gp)" + LF;
+			tempOutput += "sw $" + reg + ", " + addr + "($gp)" + LF;
 		} else {
-			tempOutput += "sw $" + String.valueOf(reg) + ", " + String.valueOf(addr) + "($sp)" + LF;
+			tempOutput += "sw $" + reg + ", " + addr + "($fp)" + LF;
 		}
 
 	}
@@ -311,13 +318,74 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 
 	@Override
 	public void enterMain() {
-		tempOutput = ".data" + LF + ".text" + LF;
-		tempOutput += "writeint:" + LF; // TODO
+		tempOutput = ".data" + LF + "staticData: " + LF + ".text" + LF;
+		tempOutput += "main:" + LF; // TODO
+		setStaticDataRegister();
+	}
+
+	private void emitProvidedProcedures() {
+		// write an int to stdout
+		enterProc("writeint", 1);
+		// load param in a0
+		loadWord((byte) 4, paramOffset(0), false);
+		loadConst((byte) 2, 1); // syscall - prep
+		tempOutput += "syscall" + LF;
+		exitProc("writeint_end");
+
+		// write a string to stdout
+		enterProc("write", 1);
+		// load param in a0
+		loadWord((byte) 4, paramOffset(0), false);
+		loadConst((byte) 2, 4); // syscall - prep
+		tempOutput += "syscall" + LF;
+		exitProc("write_end");
+
+		// write a new line to stdout
+		enterProc("writeln", 0);
+		int addrNL = this.allocStringConstant("\\n");
+		writeString(addrNL);
+		exitProc("writeln_end");
+
+		// readint procedure prolog
+		enterProc("readint", 0);
+		byte returnint = this.allocReg();
+		addConst((byte) 2, zeroReg(), 5); // add 5 to v0
+		tempOutput += "syscall" + LF;
+		add(returnint, (byte) 2, zeroReg()); // get the entered nbr
+		this.freeReg(returnint);
+		this.exitProc("readint_end");
+
+		// write a bool-exp to stdout
+		enterProc("writebool", 1);
+		// string representations of bool values
+		int addrTrue = allocStringConstant("True");
+		int addrFalse = allocStringConstant("False");
+		// get true/false constants in registers
+		byte regTrue = allocReg();
+		byte regFalse = allocReg();
+		loadAddress(regTrue, addrTrue, true);
+		loadAddress(regFalse, addrFalse, true);
+		byte boolReg = allocReg();
+		loadWord(boolReg, this.paramOffset(0), false);
+		// store false address into $a0 (default)
+		add((byte) 4, regFalse, (byte) 0);
+		branchIf(boolReg, false, "boolCalculated");
+		// store true as branch if was not correct
+		add((byte) 4, regTrue, (byte) 0);
+		emitLabel("boolCalculated", null);
+		this.loadConst((byte) 2, 4); // syscall - prep
+		tempOutput += "syscall" + LF;
+		freeReg(boolReg);
+		freeReg(regTrue);
+		freeReg(regFalse);
+		exitProc("writebool_end");
+
 	}
 
 	@Override
 	public void exitMain(String label) {
-		tempOutput += label + ":" + LF + "li $v0, 10" + LF + "syscall";
+		tempOutput += label + ":" + LF + "li $v0, 10" + LF + "syscall" + LF;
+		emitProvidedProcedures();
 		outputFile.print(tempOutput);
 		outputFile.flush();
 	}
@@ -331,7 +399,7 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 
 	@Override
 	public void exitProc(String label) {
-		tempOutput += "exit_" + label + ": " + LF;
+		tempOutput += label + ": " + LF;
 		tempOutput += "lw $ra, 0($sp)" + LF;
 		tempOutput += "addi $sp, $sp, " + wordSize() + LF;
 		tempOutput += "jr $ra " + LF;
@@ -367,8 +435,7 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 
 	@Override
 	public int paramOffset(int index) {
-		// TODO Auto-generated method stub
-		return 0;
+		return (index * 4 + 4); // fp + 4 * index = offset
 	}
 
 }
