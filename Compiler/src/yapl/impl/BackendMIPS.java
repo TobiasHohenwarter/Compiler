@@ -16,8 +16,25 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 	private Map<Byte, Boolean> registers;
 	private int stackOffset;
 	private Map<Integer, String> staticData;
-	private int staticOffset;
+	private int staticDataOffset;
 	private byte staticDataRegister;
+	private int currentFrameOffset;
+	private int preProcCallFrameOffset;
+	private int procCallParams;
+
+	public BackendMIPS(PrintStream out) {
+		this.outputFile = out;
+		tempOutput = "";
+		stackOffset = 0;
+		staticDataOffset = 0;
+		stringCount = 1;
+		currentFrameOffset = -4;
+		staticData = new HashMap<>();
+		registers = new HashMap<>();
+		for (byte i = 8; i < 26; i++) {
+			registers.put(i, false);
+		}
+	}
 
 	private void setStaticDataRegister() {
 		staticDataRegister = (byte) 25;
@@ -33,19 +50,6 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 			}
 		}
 		return j;
-	}
-
-	public BackendMIPS(PrintStream out) {
-		this.outputFile = out;
-		tempOutput = "";
-		stackOffset = 0;
-		staticOffset = 0;
-		stringCount = 1;
-		staticData = new HashMap<>();
-		registers = new HashMap<>();
-		for (byte i = 8; i < 26; i++) {
-			registers.put(i, false);
-		}
 	}
 
 	@Override
@@ -77,7 +81,6 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 	@Override
 	public void comment(String comment) {
 		tempOutput += " # " + comment + LF;
-
 	}
 
 	@Override
@@ -92,9 +95,9 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 
 	@Override
 	public int allocStaticData(int bytes, String comment) {
-		int startAddress = staticOffset;
+		int startAddress = staticDataOffset;
 		// word-aligned
-		staticOffset += (int) Math.ceil(bytes / wordSize()) * wordSize();
+		staticDataOffset += (int) Math.ceil(bytes / wordSize()) * wordSize();
 		return startAddress;
 	}
 
@@ -102,10 +105,10 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 
 	@Override
 	public int allocStringConstant(String string) {
-		int startAddress = staticOffset;
+		int startAddress = staticDataOffset;
 		string += '\0';
 		staticData.put(startAddress, "str" + stringCount);
-		staticOffset += string.getBytes().length;
+		staticDataOffset += string.getBytes().length;
 		int index = tempOutput.indexOf(".text");
 		String str1;
 		String str2;
