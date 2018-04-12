@@ -311,8 +311,8 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 
 	@Override
 	public void enterMain() {
-		tempOutput = ".data" + LF + ".text" + LF + "main:" + LF;
-
+		tempOutput = ".data" + LF + ".text" + LF;
+		tempOutput += "writeint:" + LF; // TODO
 	}
 
 	@Override
@@ -349,7 +349,6 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 	public void prepareProcCall(int numArgs) {
 		// TODO Auto-generated method stub
 		tempOutput += "subi $sp, $sp, " + (numArgs + 1) * wordSize() + LF;
-		tempOutput += "sw $ra,0($sp)" + LF;
 	}
 
 	@Override
