@@ -66,6 +66,7 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 	@Override
 	public void freeReg(byte reg) {
 		registers.put(reg, false);
+		addi(reg,zeroReg(),0);
 
 	}
 
@@ -234,13 +235,21 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 
 	@Override
 	public void arrayOffset(byte dest, byte baseAddr, byte index) {
-		tempOutput+="lw $"+dest+","+(index+1)*wordSize()+"($"+baseAddr+")"+LF;
+		byte reg=allocReg();
+		byte reg1 = allocReg();
+		addi(reg1,reg1,4);
+		addi(reg,index,1);
+		mul(reg,reg,reg1);
+	    add(reg,reg,baseAddr);
+		tempOutput+="move $"+dest+","+"$"+reg+""+LF;
+		freeReg(reg);
+		freeReg(reg1);
 
 	}
 
 	@Override
 	public void arrayLength(byte dest, byte baseAddr) {
-		tempOutput+="lw $"+dest+",0($"+baseAddr+")"+LF;
+		tempOutput+="move $"+dest+",0($"+baseAddr+")"+LF;
 
 	}
 
@@ -483,7 +492,7 @@ public class BackendMIPS implements yapl.interfaces.BackendAsmRM {
 
 	@Override
 	public void passArg(int arg, byte reg) {
-		tempOutput += " sw $" + reg + ", " + arg + "($sp) " + LF;
+		tempOutput += " sw $" + reg + ", " + arg*wordSize() + "($sp) " + LF;
 	}
 
 	@Override
